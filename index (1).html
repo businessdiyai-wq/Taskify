@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI CEO Advisor</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0ea5e9',
+              600: '#0284c7',
+              700: '#0369a1',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome Icons & Marked MD Renderer -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    /* Custom scrollbars & markdown rendering enhancements */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(71, 85, 105, 1);
+    }
+    
+    .prose p { margin-bottom: 0.75rem; }
+    .prose p:last-child { margin-bottom: 0; }
+    .prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.75rem; }
+    .prose h1, .prose h2, .prose h3 { font-weight: 700; margin-top: 1rem; margin-bottom: 0.5rem; color: #f8fafc; }
+    .prose code { background-color: rgba(30, 41, 59, 0.8); padding: 0.15rem 0.4rem; border-radius: 0.25rem; font-size: 0.875em; }
+    .prose pre { background-color: rgba(15, 23, 42, 0.9); padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin-bottom: 0.75rem; border: 1px solid rgba(51, 65, 85, 0.5); }
+    .prose pre code { background-color: transparent; padding: 0; }
+    .prose blockquote { border-left: 4px solid #0ea5e9; padding-left: 0.75rem; italic: true; color: #94a3b8; margin-bottom: 0.75rem; }
+  </style>
+</head>
+
+<body class="h-full flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-slate-950/80 backdrop-blur border-b border-slate-800 sticky top-0 z-20">
+    <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-brand-500/20">
+          <i class="fa-solid font-black fa-user-tie"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-100 leading-tight">AI CEO Advisor</h1>
+          <p class="text-xs text-slate-400 flex items-center gap-1">
+            <span id="activeProviderBadge" class="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span id="activeModelLabel">OpenRouter (openrouter/free)</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="flex space-x-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-xs font-semibold">
+        <button id="tabBtnChat" onclick="switchTab('chat')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-white bg-brand-600 shadow">
+          <i class="fa-solid fa-comments"></i>
+          <span class="hidden sm:inline">Chat</span>
+        </button>
+        <button id="tabBtnTasks" onclick="switchTab('tasks')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-list-check"></i>
+          <span class="hidden sm:inline">Tasks</span>
+          <span id="taskBadgeCount" class="ml-1 px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded-full text-[10px]">0</span>
+        </button>
+        <button id="tabBtnSetup" onclick="switchTab('setup')" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-slate-200">
+          <i class="fa-solid fa-sliders"></i>
+          <span class="hidden sm:inline">Setup</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="flex-1 max-w-4xl w-full mx-auto p-4 flex flex-col min-h-0">
+
+    <!-- Toast Notification Banner -->
+    <div id="toastNotification" class="hidden mb-4 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center justify-between animate-fade-in">
+      <div class="flex items-center space-x-2">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span id="toastText">API Key missing for current provider. Please configure Setup.</span>
+      </div>
+      <button onclick="switchTab('setup')" class="underline hover:text-white font-medium">Configure</button>
+    </div>
+
+    <!-- ================= CHAT TAB ================= -->
+    <section id="tabChat" class="flex-1 flex flex-col min-h-0 bg-slate-950/40 rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+      
+      <!-- Messages List -->
+      <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4">
+        <!-- Messages will be injected here -->
+      </div>
+
+      <!-- Quick Prompt Chips -->
+      <div class="px-4 py-2 bg-slate-900/60 border-t border-slate-800/80 overflow-x-auto flex space-x-2 no-scrollbar text-xs">
+        <button onclick="useQuickPrompt('Build vs Buy CRM: Give me an executive decision framework based on my current business scale.')" class="whitespace-nowrap px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all flex items-center space-x-1">
+          <i class="fa-solid fa-diagram-project text-brand-500"></i>
+          <span>Build vs Buy CRM</span>
+        </button>
+        <button onclick="useQuickPrompt('Help me prioritize key strategic initiatives for the next 90 days across sales, IT, and ops.')" class="whitespace-nowrap px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all flex items-center space-x-1">
+          <i class="fa-solid fa-calendar-check text-emerald-500"></i>
+          <span>Prioritize next 90 days</span>
+        </button>
+        <button onclick="useQuickPrompt('Perform an executive cyber risk & IT resilience assessment for my business infrastructure.')" class="whitespace-nowrap px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all flex items-center space-x-1">
+          <i class="fa-solid fa-shield-halved text-amber-500"></i>
+          <span>Review cybersecurity risk</span>
+        </button>
+        <button onclick="useQuickPrompt('How can I optimize our automated workflows (e.g. n8n/Make) to reduce operational overhead?')" class="whitespace-nowrap px-3 py-1.5 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700/60 transition-all flex items-center space-x-1">
+          <i class="fa-solid fa-bolt text-indigo-400"></i>
+          <span>Optimize n8n workflows</span>
+        </button>
+      </div>
+
+      <!-- Input Area -->
+      <div class="p-3 bg-slate-900 border-t border-slate-800">
+        <form id="chatForm" onsubmit="handleSendChat(event)" class="flex items-end space-x-2">
+          <div class="relative flex-1">
+            <textarea id="userInput" rows="1" oninput="autoGrowTextarea(this)" onkeydown="handleKeyDown(event)" placeholder="Ask your AI Executive Strategy Advisor..." class="w-full bg-slate-950 text-slate-100 placeholder-slate-500 border border-slate-700/80 rounded-xl py-3 pl-4 pr-10 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 text-sm resize-none max-h-32 transition-all"></textarea>
+          </div>
+          <button type="submit" id="sendBtn" class="bg-brand-600 hover:bg-brand-500 text-white p-3 rounded-xl transition-all shadow-md shadow-brand-600/20 flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed">
+            <i class="fa-solid fa-paper-plane text-sm"></i>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- ================= TASKS TAB ================= -->
+    <section id="tabTasks" class="hidden flex-1 flex flex-col min-h-0 bg-slate-950/40 rounded-2xl border border-slate-800 overflow-hidden p-4 sm:p-6 shadow-xl">
+      <div class="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+        <div>
+          <h2 class="text-lg font-bold text-slate-100">Executive Action Plan</h2>
+          <p class="text-xs text-slate-400">Extracted strategic tasks & deliverables from your conversation</p>
+        </div>
+        <div class="flex space-x-2">
+          <button onclick="exportTasksCSV()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 flex items-center space-x-1">
+            <i class="fa-solid fa-file-csv text-emerald-400"></i>
+            <span>Export CSV</span>
+          </button>
+          <button onclick="clearTasks()" class="px-3 py-1.5 bg-slate-800 hover:bg-rose-950/40 hover:text-rose-300 text-slate-400 text-xs rounded-lg border border-slate-700 transition-all">
+            <i class="fa-solid fa-trash-can"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Add manual task -->
+      <form onsubmit="handleManualAddTask(event)" class="flex space-x-2 mb-4">
+        <input type="text" id="manualTaskInput" placeholder="Add custom strategic task..." class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-brand-500">
+        <button type="submit" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-200 px-3 py-2 rounded-lg font-medium">Add Task</button>
+      </form>
+
+      <!-- Task items list -->
+      <div id="taskListContainer" class="flex-1 overflow-y-auto space-y-2 pr-1">
+        <!-- Dynamic Tasks will be loaded here -->
+      </div>
+    </section>
+
+    <!-- ================= SETUP TAB ================= -->
+    <section id="tabSetup" class="hidden flex-1 overflow-y-auto bg-slate-950/40 rounded-2xl border border-slate-800 p-4 sm:p-6 shadow-xl space-y-6">
+      <div>
+        <h2 class="text-lg font-bold text-slate-100 mb-1">Advisor & Provider Settings</h2>
+        <p class="text-xs text-slate-400">Configure your LLM provider, API credentials, and company context context.</p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Provider Selection -->
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-slate-300">LLM Provider</label>
+          <select id="setupProvider" onchange="handleProviderChange()" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
+            <option value="openrouter">OpenRouter (Free Models)</option>
+            <option value="gemini">Google Gemini</option>
+            <option value="ollama">Ollama (Local / Self-Hosted / Tunnel)</option>
+          </select>
+        </div>
+
+        <!-- Model Name Override -->
+        <div class="space-y-1">
+          <label class="block text-xs font-semibold text-slate-300">Model Name / Identifier</label>
+          <input type="text" id="setupModel" list="openrouterModels" placeholder="e.g. openrouter/free" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
+          <p class="text-[10px] text-slate-500" id="modelHelpText">Default for OpenRouter: openrouter/free (auto-picks an available free model)</p>
+          <datalist id="openrouterModels">
+            <option value="openrouter/free"></option>
+            <option value="meta-llama/llama-3.3-70b-instruct:free"></option>
+            <option value="deepseek/deepseek-r1-distill-llama-70b:free"></option>
+            <option value="qwen/qwen-2.5-72b-instruct:free"></option>
+            <option value="google/gemma-3-27b-it:free"></option>
+            <option value="mistralai/mistral-small-3.1-24b-instruct:free"></option>
+          </datalist>
+        </div>
+
+        <!-- API Key Input -->
+        <div id="apiKeyWrapper" class="space-y-1 md:col-span-2">
+          <label class="block text-xs font-semibold text-slate-300" id="apiKeyLabel">API Key</label>
+          <div class="relative">
+            <input type="password" id="setupApiKey" placeholder="Enter API Key..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 pr-10 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
+            <button type="button" onclick="togglePasswordVisibility('setupApiKey')" class="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 text-xs">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+          <p class="text-[10px] text-slate-500">Keys are stored locally in your browser's localStorage and never sent anywhere else.</p>
+        </div>
+
+        <!-- Ollama Endpoint Input -->
+        <div id="ollamaEndpointWrapper" class="space-y-1 md:col-span-2 hidden">
+          <label class="block text-xs font-semibold text-slate-300">Ollama Base URL</label>
+          <input type="text" id="setupOllamaUrl" placeholder="http://localhost:11434" class="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-100 focus:outline-none focus:border-brand-500">
+          <p class="text-[10px] text-slate-500">Make sure Ollama CORS is allowed (`OLLAMA_ORIGINS="*"`) or use Ngrok/Cloudflare tunnel if hosted remotely.</p>
+        </div>
+      </div>
+
+      <!-- Business Context -->
+      <div class="space-y-1">
+        <label class="block text-xs font-semibold text-slate-300">Your Business / Company Context</label>
+        <textarea id="setupContext" rows="5" placeholder="Provide background on your company (e.g. Industry, Team size, Tech stack, Annual revenue, Current top challenges)..." class="w-full bg-slate-900 border border-slate-700/80 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-brand-500 resize-y"></textarea>
+        <p class="text-[10px] text-slate-500">This context is injected as System Instructions so advice is tailored to your specific organization.</p>
+      </div>
+
+      <!-- Actions -->
+      <div class="pt-4 border-t border-slate-800 flex flex-wrap gap-3 justify-between items-center">
+        <button onclick="saveSettings()" class="bg-brand-600 hover:bg-brand-500 text-white font-medium text-xs px-5 py-2.5 rounded-xl shadow-lg shadow-brand-600/20 transition-all flex items-center space-x-2">
+          <i class="fa-solid fa-floppy-disk"></i>
+          <span>Save Settings</span>
+        </button>
+
+        <div class="flex space-x-2">
+          <button onclick="clearChatHistory()" class="bg-slate-800 hover:bg-rose-950/50 hover:text-rose-300 text-slate-300 text-xs px-3 py-2 rounded-xl border border-slate-700 transition-all">
+            Clear Chat History
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    /* ================= SYSTEM DEFAULTS & INITIAL STATE ================= */
+    const DEFAULT_MODELS = {
+      openrouter: 'openrouter/free',
+      gemini: 'gemini-1.5-flash',
+      ollama: 'qwen2.5:7b'
+    };
+
+    const DEFAULT_SYSTEM_PROMPT = `You are an elite AI CEO & Executive Strategy Advisor.
+Your objective is to provide executive-level guidance on business strategy, IT infrastructure, technology investments, operational automation, and risk mitigation.
+Be concise, decisive, authoritative, and practical. Frame advice with clear executive trade-offs (e.g., Cost, Velocity, Risk, Scalability).
+Whenever you provide actionable takeaways or recommendations, format them clearly or summarize them in bullet points so the user can track them as tasks.`;
+
+    let config = {
+      provider: localStorage.getItem('ceo_provider') || 'openrouter',
+      model: localStorage.getItem('ceo_model') || DEFAULT_MODELS.openrouter,
+      apiKey: localStorage.getItem('ceo_api_key') || '',
+      ollamaUrl: localStorage.getItem('ceo_ollama_url') || 'http://localhost:11434',
+      context: localStorage.getItem('ceo_context') || ''
+    };
+
+    // Migrate users who previously saved Groq settings
+    if (config.provider === 'groq') {
+      config.provider = 'openrouter';
+      config.model = DEFAULT_MODELS.openrouter;
+      config.apiKey = '';
+      localStorage.setItem('ceo_provider', config.provider);
+      localStorage.setItem('ceo_model', config.model);
+      localStorage.removeItem('ceo_api_key');
+    }
+
+    let chatHistory = JSON.parse(localStorage.getItem('ceo_chat_history') || '[]');
+    let tasks = JSON.parse(localStorage.getItem('ceo_tasks') || '[]');
+
+    /* ================= INITIALIZATION ================= */
+    window.addEventListener('DOMContentLoaded', () => {
+      initSetupUI();
+      renderChat();
+      renderTasks();
+      updateHeaderStatus();
+      
+      // Initial welcome message if history empty
+      if (chatHistory.length === 0) {
+        chatHistory.push({
+          role: 'assistant',
+          content: "Welcome. I am your AI CEO & IT Strategy Advisor. How can I assist you with high-level decisions, architecture reviews, or strategic planning today?"
+        });
+        saveChatHistory();
+        renderChat();
+      }
+    });
+
+    /* ================= NAVIGATION & TABS ================= */
+    function switchTab(tab) {
+      document.getElementById('tabChat').classList.add('hidden');
+      document.getElementById('tabTasks').classList.add('hidden');
+      document.getElementById('tabSetup').classList.add('hidden');
+
+      document.getElementById('tabBtnChat').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-slate-200";
+      document.getElementById('tabBtnTasks').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-slate-200";
+      document.getElementById('tabBtnSetup').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-slate-400 hover:text-slate-200";
+
+      if (tab === 'chat') {
+        document.getElementById('tabChat').classList.remove('hidden');
+        document.getElementById('tabBtnChat').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-white bg-brand-600 shadow";
+        scrollToBottom();
+      } else if (tab === 'tasks') {
+        document.getElementById('tabTasks').classList.remove('hidden');
+        document.getElementById('tabBtnTasks').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-white bg-brand-600 shadow";
+      } else if (tab === 'setup') {
+        document.getElementById('tabSetup').classList.remove('hidden');
+        document.getElementById('tabBtnSetup').className = "flex items-center space-x-1.5 px-3 py-1.5 rounded-lg transition-all text-white bg-brand-600 shadow";
+      }
+    }
+
+    function updateHeaderStatus() {
+      const label = document.getElementById('activeModelLabel');
+      const badge = document.getElementById('activeProviderBadge');
+      const toast = document.getElementById('toastNotification');
+
+      label.innerText = `${config.provider.toUpperCase()} (${config.model})`;
+
+      // Check key requirements
+      if (config.provider !== 'ollama' && !config.apiKey) {
+        badge.className = "inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse";
+        toast.classList.remove('hidden');
+        document.getElementById('toastText').innerText = `API Key missing for ${config.provider.toUpperCase()}. Please add it in Setup.`;
+      } else {
+        badge.className = "inline-block w-2 h-2 rounded-full bg-emerald-500";
+        toast.classList.add('hidden');
+      }
+    }
+
+    /* ================= SETUP MANAGEMENT ================= */
+    function initSetupUI() {
+      document.getElementById('setupProvider').value = config.provider;
+      document.getElementById('setupModel').value = config.model;
+      document.getElementById('setupApiKey').value = config.apiKey;
+      document.getElementById('setupOllamaUrl').value = config.ollamaUrl;
+      document.getElementById('setupContext').value = config.context;
+      handleProviderChange(false);
+    }
+
+    function handleProviderChange(resetDefaultModel = true) {
+      const provider = document.getElementById('setupProvider').value;
+      const keyWrapper = document.getElementById('apiKeyWrapper');
+      const ollamaWrapper = document.getElementById('ollamaEndpointWrapper');
+      const helpText = document.getElementById('modelHelpText');
+
+      if (resetDefaultModel) {
+        document.getElementById('setupModel').value = DEFAULT_MODELS[provider] || '';
+      }
+
+      if (provider === 'ollama') {
+        keyWrapper.classList.add('hidden');
+        ollamaWrapper.classList.remove('hidden');
+        helpText.innerText = "Default for Ollama: qwen2.5:7b or custom model pull";
+      } else {
+        keyWrapper.classList.remove('hidden');
+        ollamaWrapper.classList.add('hidden');
+        if (provider === 'openrouter') helpText.innerText = "Default: openrouter/free (auto-picks an available free model). Any model ending in :free works.";
+        if (provider === 'gemini') helpText.innerText = "Default: gemini-1.5-flash";
+      }
+    }
+
+    function saveSettings() {
+      config.provider = document.getElementById('setupProvider').value;
+      config.model = document.getElementById('setupModel').value.trim() || DEFAULT_MODELS[config.provider];
+      config.apiKey = document.getElementById('setupApiKey').value.trim();
+      config.ollamaUrl = document.getElementById('setupOllamaUrl').value.trim().replace(/\/+$/, '');
+      config.context = document.getElementById('setupContext').value.trim();
+
+      localStorage.setItem('ceo_provider', config.provider);
+      localStorage.setItem('ceo_model', config.model);
+      localStorage.setItem('ceo_api_key', config.apiKey);
+      localStorage.setItem('ceo_ollama_url', config.ollamaUrl);
+      localStorage.setItem('ceo_context', config.context);
+
+      updateHeaderStatus();
+      alert("Settings successfully saved!");
+      switchTab('chat');
+    }
+
+    function togglePasswordVisibility(id) {
+      const input = document.getElementById(id);
+      input.type = input.type === 'password' ? 'text' : 'password';
+    }
+
+    /* ================= CHAT UI & LOGIC ================= */
+    function autoGrowTextarea(el) {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    function handleKeyDown(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendChat(e);
+      }
+    }
+
+    function useQuickPrompt(text) {
+      document.getElementById('userInput').value = text;
+      handleSendChat(new Event('submit'));
+    }
+
+    function renderChat() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = '';
+
+      chatHistory.forEach((msg, idx) => {
+        const isUser = msg.role === 'user';
+        const msgWrapper = document.createElement('div');
+        msgWrapper.className = `flex ${isUser ? 'justify-end' : 'justify-start'} animate-fade-in`;
+
+        const bubble = document.createElement('div');
+        bubble.className = `max-w-[88%] sm:max-w-[80%] rounded-2xl p-4 text-xs sm:text-sm ${
+          isUser 
+            ? 'bg-brand-600 text-white rounded-br-none shadow-md' 
+            : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-none shadow-md'
+        }`;
+
+        if (isUser) {
+          bubble.innerText = msg.content;
+        } else {
+          // Format assistant Markdown
+          const parsedMd = marked.parse(msg.content);
+          bubble.innerHTML = `
+            <div class="prose text-xs sm:text-sm text-slate-200">${parsedMd}</div>
+            <div class="mt-3 pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span class="font-medium text-slate-500">AI Advisor</span>
+              <div class="flex space-x-2">
+                <button onclick="copyMessageText(${idx})" class="hover:text-slate-200 flex items-center gap-1 transition-all">
+                  <i class="fa-regular fa-copy"></i> Copy
+                </button>
+                <button onclick="extractTasksFromMessage(${idx})" class="hover:text-brand-400 flex items-center gap-1 transition-all text-brand-500">
+                  <i class="fa-solid fa-square-plus"></i> Extract Tasks
+                </button>
+              </div>
+            </div>
+          `;
+        }
+
+        msgWrapper.appendChild(bubble);
+        container.appendChild(msgWrapper);
+      });
+
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('chatMessages');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function saveChatHistory() {
+      localStorage.setItem('ceo_chat_history', JSON.stringify(chatHistory));
+    }
+
+    function clearChatHistory() {
+      if (confirm("Are you sure you want to clear the current chat history?")) {
+        chatHistory = [{
+          role: 'assistant',
+          content: "Chat reset. How can I advise you today?"
+        }];
+        saveChatHistory();
+        renderChat();
+      }
+    }
+
+    function copyMessageText(index) {
+      const msg = chatHistory[index];
+      if (msg) {
+        const dummy = document.createElement('textarea');
+        dummy.value = msg.content;
+        document.body.appendChild(dummy);
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+        alert('Copied to clipboard!');
+      }
+    }
+
+    /* ================= API LLM CALL DISPATCHER ================= */
+    async function handleSendChat(e) {
+      e.preventDefault();
+      const inputEl = document.getElementById('userInput');
+      const text = inputEl.value.trim();
+
+      if (!text) return;
+
+      // Validate credentials
+      if (config.provider !== 'ollama' && !config.apiKey) {
+        switchTab('setup');
+        alert(`Please enter your ${config.provider.toUpperCase()} API key in Setup.`);
+        return;
+      }
+
+      // Append user msg
+      chatHistory.push({ role: 'user', content: text });
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+      renderChat();
+
+      // Placeholder assistant message for streaming/loading
+      const assistantMsgIndex = chatHistory.length;
+      chatHistory.push({ role: 'assistant', content: '...' });
+      renderChat();
+
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = true;
+
+      try {
+        let finalResponseText = '';
+
+        if (config.provider === 'openrouter') {
+          finalResponseText = await fetchOpenRouterAPI();
+        } else if (config.provider === 'gemini') {
+          finalResponseText = await fetchGeminiAPI();
+        } else if (config.provider === 'ollama') {
+          finalResponseText = await fetchOllamaAPI();
+        }
+
+        chatHistory[assistantMsgIndex].content = finalResponseText;
+        saveChatHistory();
+        renderChat();
+      } catch (err) {
+        console.error(err);
+        chatHistory[assistantMsgIndex].content = `⚠️ **Error generating advice**: ${err.message || err}\n\n*Please verify your API key, CORS configuration, network connection, or local server availability in Setup.*`;
+        saveChatHistory();
+        renderChat();
+      } finally {
+        sendBtn.disabled = false;
+      }
+    }
+
+    /* Helper: Prepare messages with business context injected */
+    function buildFormattedMessages() {
+      const messages = [];
+      let systemContent = DEFAULT_SYSTEM_PROMPT;
+      if (config.context) {
+        systemContent += `\n\n[USER BUSINESS CONTEXT]:\n${config.context}`;
+      }
+      messages.push({ role: 'system', content: systemContent });
+
+      // Append history except last placeholder
+      chatHistory.slice(0, -1).forEach(m => {
+        if (m.role === 'user' || m.role === 'assistant') {
+          messages.push({ role: m.role, content: m.content });
+        }
+      });
+
+      return messages;
+    }
+
+    /* 1. OpenRouter Fetch (with free-model fallbacks) */
+    const OPENROUTER_FALLBACKS = [
+      'openrouter/free',
+      'meta-llama/llama-3.3-70b-instruct:free',
+      'qwen/qwen-2.5-72b-instruct:free',
+      'mistralai/mistral-small-3.1-24b-instruct:free'
+    ];
+
+    async function fetchOpenRouterAPI() {
+      const primary = config.model || DEFAULT_MODELS.openrouter;
+      const candidates = [primary, ...OPENROUTER_FALLBACKS.filter(m => m !== primary)];
+      let lastError = '';
+
+      for (const model of candidates) {
+        let res;
+        try {
+          res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${config.apiKey}`,
+              'HTTP-Referer': window.location.origin || 'https://localhost',
+              'X-Title': 'AI CEO Advisor'
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: buildFormattedMessages(),
+              temperature: 0.6
+            })
+          });
+        } catch (netErr) {
+          throw new Error(`Network error reaching OpenRouter: ${netErr.message}`);
+        }
+
+        if (res.ok) {
+          const data = await res.json();
+          const text = data.choices?.[0]?.message?.content;
+          if (text) return text;
+          lastError = `Empty response from ${model}`;
+          continue;
+        }
+
+        const errData = await res.json().catch(() => ({}));
+        lastError = errData.error?.message || `OpenRouter Error ${res.status}`;
+
+        // Bad/expired key: no point trying other models
+        if (res.status === 401 || res.status === 402 || res.status === 403) {
+          throw new Error(lastError);
+        }
+        // 404 (model gone), 429 (rate limited), 5xx / provider errors: try next free model
+      }
+
+      throw new Error(`All free models failed. Last error: ${lastError}`);
+    }
+
+    /* 3. Google Gemini Fetch */
+    async function fetchGeminiAPI() {
+      const modelName = config.model || DEFAULT_MODELS.gemini;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${config.apiKey}`;
+
+      let systemInstruction = DEFAULT_SYSTEM_PROMPT;
+      if (config.context) {
+        systemInstruction += `\n\n[USER BUSINESS CONTEXT]:\n${config.context}`;
+      }
+
+      const contents = [];
+      chatHistory.slice(0, -1).forEach(m => {
+        if (m.role === 'user') {
+          contents.push({ role: 'user', parts: [{ text: m.content }] });
+        } else if (m.role === 'assistant') {
+          contents.push({ role: 'model', parts: [{ text: m.content }] });
+        }
+      });
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: systemInstruction }] },
+          contents: contents
+        })
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `Gemini Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      return data.candidates[0]?.content?.parts[0]?.text || 'No response returned.';
+    }
+
+    /* 4. Ollama Fetch */
+    async function fetchOllamaAPI() {
+      const baseUrl = config.ollamaUrl || 'http://localhost:11434';
+      // Attempting OpenAI compatible endpoint first
+      const endpoint = `${baseUrl}/v1/chat/completions`;
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: config.model || DEFAULT_MODELS.ollama,
+            messages: buildFormattedMessages(),
+            stream: false
+          })
+        });
+
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        return data.choices[0]?.message?.content || 'No response received from Ollama.';
+      } catch (err) {
+        // Fallback to native Ollama /api/generate
+        const fallbackEndpoint = `${baseUrl}/api/generate`;
+        let promptText = DEFAULT_SYSTEM_PROMPT + "\n\n";
+        if (config.context) promptText += `Context: ${config.context}\n\n`;
+
+        chatHistory.slice(0, -1).forEach(m => {
+          promptText += `${m.role.toUpperCase()}: ${m.content}\n`;
+        });
+        promptText += "ASSISTANT: ";
+
+        const resFallback = await fetch(fallbackEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model: config.model || DEFAULT_MODELS.ollama,
+            prompt: promptText,
+            stream: false
+          })
+        });
+
+        if (!resFallback.ok) {
+          throw new Error(`Failed to connect to Ollama at ${baseUrl}. Ensure CORS is enabled with OLLAMA_ORIGINS="*"`);
+        }
+
+        const dataFallback = await resFallback.json();
+        return dataFallback.response || 'No response received from Ollama native endpoint.';
+      }
+    }
+
+    /* ================= TASK EXTRACTION & MANAGEMENT ================= */
+    function extractTasksFromMessage(index) {
+      const msg = chatHistory[index];
+      if (!msg || !msg.content) return;
+
+      // Extract lines starting with bullet points, numbers, or todo markers
+      const lines = msg.content.split('\n');
+      const extracted = [];
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (/^[-*•]\s+/.test(trimmed) || /^\d+\.\s+/.test(trimmed) || /^\[[ xX]?\]\s+/.test(trimmed)) {
+          const taskText = trimmed.replace(/^([-*•]|\d+\.|\[[ xX]?\])\s+/, '').replace(/\*\*/g, '').trim();
+          if (taskText.length > 5) {
+            extracted.push(taskText);
+          }
+        }
+      });
+
+      if (extracted.length === 0) {
+        alert("No clear bulleted tasks found in this message. You can manually add tasks in the Tasks tab!");
+        return;
+      }
+
+      let count = 0;
+      extracted.forEach(txt => {
+        if (!tasks.some(t => t.text === txt)) {
+          tasks.push({ id: Date.now() + Math.random(), text: txt, done: false });
+          count++;
+        }
+      });
+
+      saveTasks();
+      renderTasks();
+      switchTab('tasks');
+      alert(`Extracted ${count} new action items into your Tasks list!`);
+    }
+
+    function handleManualAddTask(e) {
+      e.preventDefault();
+      const input = document.getElementById('manualTaskInput');
+      const text = input.value.trim();
+      if (text) {
+        tasks.push({ id: Date.now(), text: text, done: false });
+        input.value = '';
+        saveTasks();
+        renderTasks();
+      }
+    }
+
+    function toggleTask(id) {
+      tasks = tasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
+      saveTasks();
+      renderTasks();
+    }
+
+    function deleteTask(id) {
+      tasks = tasks.filter(t => t.id !== id);
+      saveTasks();
+      renderTasks();
+    }
+
+    function clearTasks() {
+      if (confirm("Are you sure you want to delete all tasks?")) {
+        tasks = [];
+        saveTasks();
+        renderTasks();
+      }
+    }
+
+    function saveTasks() {
+      localStorage.setItem('ceo_tasks', JSON.stringify(tasks));
+      document.getElementById('taskBadgeCount').innerText = tasks.filter(t => !t.done).length;
+    }
+
+    function renderTasks() {
+      const container = document.getElementById('taskListContainer');
+      container.innerHTML = '';
+
+      document.getElementById('taskBadgeCount').innerText = tasks.filter(t => !t.done).length;
+
+      if (tasks.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 text-slate-500 text-xs">
+            <i class="fa-solid fa-list-check text-2xl mb-2 text-slate-600 block"></i>
+            No tasks found. Extract action items from advisor chat responses or add them manually above.
+          </div>
+        `;
+        return;
+      }
+
+      tasks.forEach(task => {
+        const div = document.createElement('div');
+        div.className = `flex items-center justify-between p-3 rounded-xl border transition-all ${
+          task.done 
+            ? 'bg-slate-900/40 border-slate-800/60 opacity-60' 
+            : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+        }`;
+
+        div.innerHTML = `
+          <div class="flex items-center space-x-3 flex-1 min-w-0 pr-2">
+            <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${task.id})" class="w-4 h-4 rounded text-brand-600 bg-slate-950 border-slate-700 focus:ring-brand-500 accent-brand-500 cursor-pointer">
+            <span class="text-xs text-slate-200 ${task.done ? 'line-through text-slate-500' : ''} truncate">${escapeHtml(task.text)}</span>
+          </div>
+          <button onclick="deleteTask(${task.id})" class="text-slate-500 hover:text-rose-400 p-1 text-xs transition-all">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function exportTasksCSV() {
+      if (tasks.length === 0) {
+        alert("No tasks to export.");
+        return;
+      }
+
+      let csvContent = "data:text/csv;charset=utf-8,Status,Task\n";
+      tasks.forEach(t => {
+        const status = t.done ? "Completed" : "Pending";
+        const cleanText = `"${t.text.replace(/"/g, '""')}"`;
+        csvContent += `${status},${cleanText}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Executive_Action_Tasks_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.innerText = text;
+      return div.innerHTML;
+    }
+  </script>
+</body>
+</html>
